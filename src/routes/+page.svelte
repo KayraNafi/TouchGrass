@@ -287,7 +287,12 @@
 
   function formatClock(date: Date | null): string {
     if (!date) return "";
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      hourCycle: "h23",
+    });
   }
 
   $effect(() => {
@@ -767,6 +772,8 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .card__title-help {

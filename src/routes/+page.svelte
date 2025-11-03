@@ -34,12 +34,43 @@
   let lastReminderMessage = $state<string | null>(null);
   let lastReminderAt = $state<Date | null>(null);
 
+  const LIGHT_MODE_WARNING_KEY = "touchgrass.lightModeWarningAcknowledged";
+  const LIGHT_MODE_CONFIRM_MESSAGES = [
+    "Light mode? Bold choice, sunflower.",
+    "Turning the sun on indoors, are we?",
+    "Sure, let’s blind the owls. Light mode engaged.",
+    "Dark mode is hurt but it understands.",
+    "Light mode it is. Sunglasses optional.",
+    "Engaging photon cannon… ☀️",
+    "Welcome to the bright side.",
+    "Brightness: 100%. Subtlety: 0%.",
+    "Alert: vampires have left the chat.",
+    "Okay, lighthouse. Light mode on.",
+    "SPF 50 applied. Proceed.",
+    "Hope your retinas stretched first.",
+    "Your screen, your rules.",
+    "Plants are thrilled. 🌱",
+    "Sunrise achieved.",
+  ] as const;
+  const SNOOZE_MESSAGES = [
+    (minutes: number) => `Snoozed ${minutes}m. Don't ghost me.`,
+    (_minutes: number) => "Okay, future-you will handle it.",
+  ] as const;
+  let lightModeWarningAcknowledged = $state(false);
+
   let audioContext: AudioContext | null = null;
   let unlistenStatus: UnlistenFn | null = null;
   let unlistenReminder: UnlistenFn | null = null;
 
   onMount(async () => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(LIGHT_MODE_WARNING_KEY);
+      lightModeWarningAcknowledged = stored === "true";
+    }
     await loadInitial();
+    if (preferences?.theme === "light" && !lightModeWarningAcknowledged) {
+      markLightModeWarningAcknowledged();
+    }
     await setupListeners();
   });
 
@@ -76,6 +107,23 @@
       "touchgrass://reminder",
       (event) => handleReminder(event.payload),
     );
+  }
+
+  function markLightModeWarningAcknowledged() {
+    lightModeWarningAcknowledged = true;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LIGHT_MODE_WARNING_KEY, "true");
+    }
+  }
+
+  function randomLightModeMessage(): string {
+    const index = Math.floor(Math.random() * LIGHT_MODE_CONFIRM_MESSAGES.length);
+    return LIGHT_MODE_CONFIRM_MESSAGES[index];
+  }
+
+  function randomSnoozeMessage(minutes: number): string {
+    const index = Math.floor(Math.random() * SNOOZE_MESSAGES.length);
+    return SNOOZE_MESSAGES[index](minutes);
   }
 
   function ensureAudioContext() {
@@ -170,6 +218,28 @@
     await applyPreference({ theme });
   }
 
+  async function handleThemeToggle(event: Event) {
+    if (!preferences) return;
+    const input = event.currentTarget as HTMLInputElement | null;
+    if (!input) return;
+    const revertChecked = preferences.theme !== "light";
+    const nextTheme = input.checked ? "dark" : "light";
+
+    if (nextTheme === "light") {
+      const confirmed = window.confirm(randomLightModeMessage());
+      if (!confirmed) {
+        input.checked = revertChecked;
+        return;
+      }
+      if (!lightModeWarningAcknowledged) {
+        markLightModeWarningAcknowledged();
+      }
+    }
+
+    input.checked = nextTheme !== "light";
+    await setTheme(nextTheme);
+  }
+
   async function setIdleThreshold(minutes: number) {
     if (!preferences || pending) return;
     if (Number.isNaN(minutes)) return;
@@ -184,7 +254,11 @@
     try {
       await invoke<void>("set_pause_state", { paused: next });
       status = { ...status, paused: next };
-      showToast(next ? "Reminders paused" : "Reminders resumed");
+      showToast(
+        next
+          ? "Noted. I’ll try again when you’re less dramatic."
+          : "Reminders resumed. Chair missed you (a little).",
+      );
     } catch (error) {
       console.error("TouchGrass: failed to toggle pause", error);
       showToast("Could not pause reminders");
@@ -194,7 +268,7 @@
   async function snooze(minutes: number) {
     try {
       await invoke<void>("snooze_for_minutes", { minutes });
-      showToast(`Snoozed for ${minutes} minutes`);
+      showToast(randomSnoozeMessage(minutes));
     } catch (error) {
       console.error("TouchGrass: failed to snooze", error);
       showToast("Could not snooze reminders");
@@ -204,7 +278,7 @@
   async function clearSnooze() {
     try {
       await invoke<void>("clear_snooze");
-      showToast("Snooze cancelled");
+      showToast("Snooze cancelled. Chair missed you (a little).");
     } catch (error) {
       console.error("TouchGrass: failed to clear snooze", error);
       showToast("Could not cancel snooze");
@@ -317,7 +391,7 @@
         <input
           type="checkbox"
           checked={preferences?.theme !== "light"}
-          onchange={(event) => setTheme(event.currentTarget.checked ? "dark" : "light")}
+          onchange={handleThemeToggle}
           disabled={pending || !preferences}
         />
         <span
@@ -357,12 +431,13 @@
         <div class="summary__line">
           <span class="summary__label">Latest nudge</span>
           <span class="summary__value summary__value--small">
-            {lastNudge ? formatClock(lastNudge) : "Not yet"}
+            {#if lastNudge}
+              {formatRelative(lastNudge)} ({formatClock(lastNudge)})
+            {:else}
+              Not yet
+            {/if}
           </span>
         </div>
-        {#if lastNudge}
-          <span class="summary__meta">{formatRelative(lastNudge)}</span>
-        {/if}
       </div>
     </div>
 

@@ -533,7 +533,7 @@ async fn send_reminder(app: &AppHandle<Wry>, prefs: &Preferences) {
     let notification_result = app
         .notification()
         .builder()
-        .title("TouchGrass break")
+        .title("TouchGrass")
         .body(message.clone())
         .show();
 
@@ -558,11 +558,24 @@ async fn send_reminder(app: &AppHandle<Wry>, prefs: &Preferences) {
 
 fn choose_reminder_message() -> String {
     const MESSAGES: &[&str] = &[
-        "Stretch, hydrate, go touch grass.",
-        "Micro-break alert: let your eyes wander beyond the screen.",
-        "Stand up, roll those shoulders, be less chair.",
-        "Break time! Your spine will thank you.",
-        "Walk to a window and find some actual green.",
+        "Stand up before you photosynthesize.",
+        "Touch grass (nearby plant also counts).",
+        "Keyboard's hot, legs are not.",
+        "Blink like you mean it: 10x.",
+        "Break speedrun in 30s. Go.",
+        "Free DLC: posture.",
+        "Up. Now. Your chair has attachment issues.",
+        "Stand before you grow roots.",
+        "Blink or become a raisin.",
+        "Walk away like the main character.",
+        "Your spine filed a ticket.",
+        "Walk. The chair will cope.",
+        "Your posture called HR.",
+        "Side quest: 30s breathing.",
+        "Keyboard is not a life partner.",
+        "AFK or AF-ache.",
+        "Stare at something >20ft, not your soul.",
+        "Load-bearing human requires maintenance.",
     ];
 
     let mut rng = rng();

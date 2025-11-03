@@ -2,6 +2,8 @@
   import { onMount, onDestroy } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+  import { relaunch } from "@tauri-apps/plugin-process";
+  import { check, type Update } from "@tauri-apps/plugin-updater";
 
   type Preferences = {
     intervalMinutes: number;
@@ -34,6 +36,11 @@
   let lastReminderMessage = $state<string | null>(null);
   let lastReminderAt = $state<Date | null>(null);
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+  let updateChecking = $state(false);
+  let updateInstalling = $state(false);
+  let updateAvailable = $state(false);
+  let updateInfo = $state<{ version: string; notes?: string | null } | null>(null);
+  let pendingUpdate: Update | null = null;
 
   const LIGHT_MODE_WARNING_KEY = "touchgrass.lightModeWarningAcknowledged";
   const LIGHT_MODE_CONFIRM_MESSAGES = [
@@ -73,6 +80,7 @@
       markLightModeWarningAcknowledged();
     }
     await setupListeners();
+    await checkForUpdates();
   });
 
   onDestroy(() => {
@@ -80,6 +88,12 @@
     unlistenReminder?.();
     if (toastTimeout) {
       clearTimeout(toastTimeout);
+    }
+    if (pendingUpdate) {
+      pendingUpdate.close().catch((error) => {
+        console.warn("TouchGrass: failed to dispose update handle", error);
+      });
+      pendingUpdate = null;
     }
   });
 
@@ -299,6 +313,72 @@
     }
   }
 
+  async function checkForUpdates(manual = false) {
+    if (updateChecking) return;
+    updateChecking = true;
+    try {
+      if (typeof window === "undefined" || !(window as { __TAURI__?: unknown }).__TAURI__) {
+        updateChecking = false;
+        return;
+      }
+      const update = await check();
+      if (!update) {
+        if (manual) {
+          showToast("You're already on the latest version");
+        }
+        if (pendingUpdate) {
+          await pendingUpdate.close();
+          pendingUpdate = null;
+        }
+        updateAvailable = false;
+        updateInfo = null;
+        return;
+      }
+
+      if (pendingUpdate) {
+        await pendingUpdate.close().catch((error) => {
+          console.warn("TouchGrass: failed to close stale update handle", error);
+        });
+      }
+
+      pendingUpdate = update;
+      updateAvailable = true;
+      updateInfo = { version: update.version, notes: update.body ?? null };
+
+      if (!manual) {
+        showToast(`Update ${update.version} is ready to install`);
+      }
+    } catch (error) {
+      console.error("TouchGrass: update check failed", error);
+      if (manual) {
+        showToast("Could not check for updates");
+      }
+    } finally {
+      updateChecking = false;
+    }
+  }
+
+  async function installPendingUpdate() {
+    if (!pendingUpdate || updateInstalling) return;
+    updateInstalling = true;
+    try {
+      await pendingUpdate.downloadAndInstall();
+      showToast("Update installed. Restarting…");
+      await relaunch();
+    } catch (error) {
+      console.error("TouchGrass: failed to install update", error);
+      showToast("Update could not be installed");
+    } finally {
+      updateInstalling = false;
+      if (pendingUpdate) {
+        pendingUpdate.close().catch((err) => {
+          console.warn("TouchGrass: failed to close update handle after install", err);
+        });
+        pendingUpdate = null;
+      }
+    }
+  }
+
   function showToast(message: string) {
     toastMessage = message;
     if (toastTimeout) {
@@ -413,6 +493,33 @@
         </span>
       </label>
 
+      <div class="top__update">
+        {#if updateAvailable && updateInfo}
+          <div class="update-banner">
+            <div class="update-banner__info">
+              <span class="update-banner__label">Update ready</span>
+              <strong>v{updateInfo.version}</strong>
+            </div>
+            <button
+              type="button"
+              class="button button--primary button--compact"
+              onclick={installPendingUpdate}
+              disabled={updateInstalling}
+            >
+              {updateInstalling ? "Installing…" : "Install now"}
+            </button>
+          </div>
+        {:else}
+          <button
+            type="button"
+            class="button button--ghost button--compact top__update-check"
+            onclick={() => checkForUpdates(true)}
+            disabled={updateChecking}
+          >
+            {updateChecking ? "Checking…" : "Check for updates"}
+          </button>
+        {/if}
+      </div>
     </div>
   </header>
 
@@ -665,6 +772,17 @@
   gap: 0.65rem;
 }
 
+.top__update {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.top__update-check {
+  align-self: flex-end;
+}
+
 .theme-switch {
   display: flex;
   align-items: center;
@@ -721,6 +839,30 @@
 
 .theme-switch__caption {
   font-weight: 600;
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--tg-radius-md);
+  border: 1px solid var(--tg-color-interactive-border);
+  background: var(--tg-color-surface-muted);
+}
+
+.update-banner__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  text-align: left;
+}
+
+.update-banner__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--tg-color-text-soft);
 }
 
 .top-panel {
@@ -1178,6 +1320,15 @@
   .top__actions {
     width: 100%;
     align-items: flex-start;
+  }
+
+  .top__update {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .update-banner {
+    justify-content: space-between;
   }
 
   .top-panel {

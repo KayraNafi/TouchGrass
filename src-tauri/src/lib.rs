@@ -8,6 +8,8 @@ use app_state::{AppState, Preferences, PreferencesUpdate, StatusSnapshot};
 use events::StatusPayload;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent, Wry};
 use tauri_plugin_autostart::MacosLauncher;
+#[cfg(desktop)]
+use tauri_plugin_updater::Builder as UpdaterBuilder;
 
 type CommandResult<T> = Result<T, String>;
 
@@ -66,6 +68,7 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             get_preferences,
@@ -77,6 +80,13 @@ pub fn run() {
             trigger_preview
         ])
         .setup(|app| {
+            #[cfg(desktop)]
+            {
+                app.handle()
+                    .plugin(UpdaterBuilder::new().build())
+                    .map_err(|e| boxed(e))?;
+            }
+
             let app_handle = app.handle();
             let state = AppState::initialize(&app_handle).map_err(|e| boxed(e))?;
             let tray_state = state.clone();

@@ -125,11 +125,18 @@ cargo check  # Validate the Rust backend
 cargo fmt    # Format Rust sources
 ```
 
+## Packaging & updates
+
+- **Platforms** – Official installers for Debian (`.deb`), Fedora (`.rpm`), and Windows (`.msi`/`.zip`) are published with every tagged release. Grab the latest build from the [GitHub Releases](../../releases) page.
+- **Auto updates** – The desktop app checks for new releases on launch (and when you tap “Check for updates”) and offers to install them in place.
+- **For maintainers** – Follow `docs/release-guide.md` when preparing a new version.
+
 ## Roadmap snapshot
 
 - [x] MVP reminder loop with idle-aware scheduling
 - [x] Tray menu + settings UI + optional chime
-- [ ] Cross-platform packaging scripts (MSI / DMG / AppImage)
+- [x] Cross-platform packaging (Debian/RPM/Windows) with signed auto-updates
+- [ ] macOS build target & notarization pipeline
 - [ ] Automated tests & smoke-test matrix
 - [ ] Additional quick actions (custom snooze lengths, shortcuts)
 

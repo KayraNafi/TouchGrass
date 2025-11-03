@@ -252,15 +252,53 @@ fn load_preferences(path: &Path) -> Result<Preferences, AppStateError> {
         return Ok(Preferences::default());
     }
 
-    let file = File::open(path)?;
-    let prefs = serde_json::from_reader(file)?;
-    Ok(prefs)
+    let contents = fs::read_to_string(path)?;
+    match serde_json::from_str::<Preferences>(&contents) {
+        Ok(prefs) => Ok(prefs),
+        Err(err) => {
+            eprintln!(
+                "TouchGrass: preferences.json was invalid ({err}); restoring defaults."
+            );
+            backup_corrupt_preferences(path);
+            let defaults = Preferences::default();
+            save_preferences(path, &defaults)?;
+            Ok(defaults)
+        }
+    }
 }
 
 fn save_preferences(path: &Path, prefs: &Preferences) -> Result<(), AppStateError> {
     let file = File::create(path)?;
     serde_json::to_writer_pretty(file, prefs)?;
     Ok(())
+}
+
+fn backup_corrupt_preferences(path: &Path) {
+    let mut backup_path = path.with_extension("json.corrupt");
+    if backup_path.exists() {
+        let mut counter = 1;
+        loop {
+            let candidate = path.with_extension(format!("json.corrupt.{counter}"));
+            if !candidate.exists() {
+                backup_path = candidate;
+                break;
+            }
+            counter += 1;
+        }
+    }
+
+    match fs::rename(path, &backup_path) {
+        Ok(_) => eprintln!(
+            "TouchGrass: moved corrupt preferences to {}",
+            backup_path.display()
+        ),
+        Err(err) => {
+            eprintln!(
+                "TouchGrass: failed to backup corrupt preferences ({err}); removing file."
+            );
+            let _ = fs::remove_file(path);
+        }
+    }
 }
 
 fn default_idle_threshold_minutes() -> u64 {
@@ -428,10 +466,29 @@ async fn run_engine(
                 match msg {
                     ControlMessage::PreferencesUpdated(new_prefs) => {
                         prefs = new_prefs;
-                        next_instant = Instant::now() + prefs.interval_duration();
+                        let now = Utc::now();
+                        let mut recalculated_next = Instant::now() + prefs.interval_duration();
+                        if let Some(until) = snoozed_until {
+                            if until > now {
+                                if let Ok(wait) = (until - now).to_std() {
+                                    recalculated_next = Instant::now() + wait;
+                                } else {
+                                    recalculated_next = Instant::now();
+                                }
+                            } else {
+                                snoozed_until = None;
+                            }
+                        }
+                        next_instant = recalculated_next;
                         sleep.as_mut().reset(next_instant);
                         update_status(&app, &status, |snapshot| {
-                            snapshot.next_trigger_at = Some(timestamp_from_instant(next_instant));
+                            snapshot.paused = paused;
+                            snapshot.snoozed_until = snoozed_until;
+                            snapshot.next_trigger_at = if paused {
+                                None
+                            } else {
+                                Some(timestamp_from_instant(next_instant))
+                            };
                             snapshot.idle_seconds = last_idle_secs;
                         });
                     }

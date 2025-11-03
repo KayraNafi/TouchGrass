@@ -33,6 +33,7 @@
   let toastMessage = $state<string | null>(null);
   let lastReminderMessage = $state<string | null>(null);
   let lastReminderAt = $state<Date | null>(null);
+  let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const LIGHT_MODE_WARNING_KEY = "touchgrass.lightModeWarningAcknowledged";
   const LIGHT_MODE_CONFIRM_MESSAGES = [
@@ -77,6 +78,9 @@
   onDestroy(() => {
     unlistenStatus?.();
     unlistenReminder?.();
+    if (toastTimeout) {
+      clearTimeout(toastTimeout);
+    }
   });
 
   async function loadInitial() {
@@ -297,8 +301,12 @@
 
   function showToast(message: string) {
     toastMessage = message;
-    setTimeout(() => {
+    if (toastTimeout) {
+      clearTimeout(toastTimeout);
+    }
+    toastTimeout = setTimeout(() => {
       toastMessage = null;
+      toastTimeout = null;
     }, 2200);
   }
 
@@ -1114,11 +1122,6 @@
 
 .button--warning:hover:not(:disabled) {
   box-shadow: 0 8px 22px rgba(200, 78, 78, 0.22);
-}
-
-.button--active {
-  background: rgba(45, 134, 89, 0.32);
-  border-color: rgba(45, 134, 89, 0.55);
 }
 
 .footer {

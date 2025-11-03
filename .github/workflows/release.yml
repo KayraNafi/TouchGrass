@@ -16,8 +16,8 @@ jobs:
     name: Build Debian package
     runs-on: ubuntu-latest
     env:
-      TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
       TOUCHGRASS_UPDATER_PUBKEY: ${{ secrets.TOUCHGRASS_UPDATER_PUBKEY }}
     defaults:
       run:
@@ -40,6 +40,12 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libssl-dev \
             librsvg2-dev \
+            libx11-dev \
+            libxdo-dev \
+            libxcb1-dev \
+            libxrandr-dev \
+            libxss-dev \
+            libdbus-1-dev \
             patchelf
 
       - name: Set up Node.js
@@ -95,8 +101,8 @@ jobs:
     container:
       image: fedora:40
     env:
-      TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
       TOUCHGRASS_UPDATER_PUBKEY: ${{ secrets.TOUCHGRASS_UPDATER_PUBKEY }}
     defaults:
       run:
@@ -109,6 +115,7 @@ jobs:
             webkit2gtk4.1-devel libsoup3-devel gtk3-devel \
             libappindicator-gtk3-devel libayatana-appindicator-gtk3-devel \
             libXScrnSaver-devel dbus-devel patchelf rpm-build \
+            libX11-devel libxdo-devel libxcb-devel libXrandr-devel \
             pkgconfig nodejs npm gcc make
 
       - name: Set up pnpm
@@ -152,8 +159,8 @@ jobs:
     name: Build Windows installer
     runs-on: windows-latest
     env:
-      TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-      TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
       TOUCHGRASS_UPDATER_PUBKEY: ${{ secrets.TOUCHGRASS_UPDATER_PUBKEY }}
     steps:
       - name: Checkout repository

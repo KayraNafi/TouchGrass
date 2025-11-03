@@ -1,0 +1,67 @@
+name: Release Fedora RPM
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-fedora-rpm:
+    name: Build RPM (Fedora)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:40
+    steps:
+      - name: Install system dependencies
+        run: |
+          dnf -y update
+          dnf -y install git curl wget \
+            webkit2gtk4.1-devel libsoup3-devel gtk3-devel \
+            libappindicator-gtk3-devel libayatana-appindicator-gtk3-devel \
+            libXScrnSaver-devel dbus-devel patchelf rpm-build \
+            nodejs npm
+          npm install -g pnpm@8
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Cache pnpm store
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+      - name: Restore pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Svelte check
+        run: pnpm check
+
+      - name: Run cargo check
+        run: |
+          source $HOME/.cargo/env
+          cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Build RPM via Tauri
+        run: |
+          source $HOME/.cargo/env
+          pnpm tauri build --bundles rpm
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: touchgrass-rpm-${{ github.ref_name }}
+          path: src-tauri/target/release/bundle/rpm/*.rpm

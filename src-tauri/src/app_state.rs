@@ -211,6 +211,10 @@ impl AppState {
         let _ = self.control_tx.send(ControlMessage::Snooze(duration)).await;
     }
 
+    pub async fn clear_snooze(&self) {
+        let _ = self.control_tx.send(ControlMessage::ClearSnooze).await;
+    }
+
     pub async fn trigger_preview(&self) {
         let _ = self.control_tx.send(ControlMessage::TriggerNow).await;
     }
@@ -239,6 +243,7 @@ enum ControlMessage {
     PreferencesUpdated(Preferences),
     Pause(bool),
     Snooze(Duration),
+    ClearSnooze,
     TriggerNow,
 }
 
@@ -454,6 +459,22 @@ async fn run_engine(
                         update_status(&app, &status, |snapshot| {
                             snapshot.snoozed_until = snoozed_until;
                             snapshot.next_trigger_at = Some(timestamp_from_instant(next_instant));
+                            snapshot.idle_seconds = last_idle_secs;
+                        });
+                    }
+                    ControlMessage::ClearSnooze => {
+                        snoozed_until = None;
+                        if !paused {
+                            next_instant = Instant::now() + prefs.interval_duration();
+                            sleep.as_mut().reset(next_instant);
+                        }
+                        update_status(&app, &status, |snapshot| {
+                            snapshot.snoozed_until = None;
+                            snapshot.next_trigger_at = if paused {
+                                None
+                            } else {
+                                Some(timestamp_from_instant(next_instant))
+                            };
                             snapshot.idle_seconds = last_idle_secs;
                         });
                     }

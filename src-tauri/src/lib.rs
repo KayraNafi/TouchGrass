@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use app_state::{AppState, Preferences, PreferencesUpdate, StatusSnapshot};
 use events::StatusPayload;
-use tauri::{AppHandle, Emitter, Manager, State, Wry};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent, Wry};
 use tauri_plugin_autostart::MacosLauncher;
 
 type CommandResult<T> = Result<T, String>;
@@ -46,6 +46,12 @@ async fn snooze_for_minutes(state: State<'_, Arc<AppState>>, minutes: u64) -> Co
 }
 
 #[tauri::command]
+async fn clear_snooze(state: State<'_, Arc<AppState>>) -> CommandResult<()> {
+    state.clear_snooze().await;
+    Ok(())
+}
+
+#[tauri::command]
 async fn trigger_preview(state: State<'_, Arc<AppState>>) -> CommandResult<()> {
     state.trigger_preview().await;
     Ok(())
@@ -67,6 +73,7 @@ pub fn run() {
             get_status,
             set_pause_state,
             snooze_for_minutes,
+            clear_snooze,
             trigger_preview
         ])
         .setup(|app| {
@@ -91,6 +98,17 @@ pub fn run() {
         .on_menu_event(|app, event| {
             if event.id().as_ref() == "quit" {
                 app.exit(0);
+            }
+        })
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+
+            if let WindowEvent::Resized(_) = event {
+                if let Ok(true) = window.is_minimized() {
+                    let _ = window.hide();
+                }
             }
         })
         .on_tray_icon_event(|app, event| {

@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  PNPM_VERSION: 8
+  PNPM_VERSION: 10
   NODE_VERSION: 20
   RUST_TOOLCHAIN: stable
 
@@ -46,6 +46,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
+
+      - name: Install pnpm
+        run: npm install -g pnpm@${PNPM_VERSION}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -156,9 +159,6 @@ jobs:
       TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
       TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
       TOUCHGRASS_UPDATER_PUBKEY: ${{ secrets.TOUCHGRASS_UPDATER_PUBKEY }}
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -168,6 +168,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "pnpm"
+
+      - name: Install pnpm
+        run: npm install -g pnpm@${PNPM_VERSION}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

@@ -6,6 +6,11 @@ TouchGrass is a lightweight Tauri desktop companion that keeps you honest about 
 
 ![TouchGrass settings window](docs/screenshot-settings.png)
 
+## Download
+
+- **Latest installers** – grab the current release for Debian, Fedora, or Windows from the [Releases page](../../releases).
+- **Auto updates** – once installed, TouchGrass checks for updates when it launches and offers a one-click install inside the app.
+
 ## Features
 
 - **Adaptive reminders** – choose from common presets or custom intervals; timers automatically restart when you have been idle for a user-defined window (default 2 min).
@@ -127,9 +132,8 @@ cargo fmt    # Format Rust sources
 
 ## Packaging & updates
 
-- **Platforms** – Official installers for Debian (`.deb`), Fedora (`.rpm`), and Windows (`.msi`/`.zip`) are published with every tagged release. Grab the latest build from the [GitHub Releases](../../releases) page.
-- **Auto updates** – The desktop app checks for new releases on launch (and when you tap “Check for updates”) and offers to install them in place.
-- **For maintainers** – Follow `docs/release-guide.md` when preparing a new version.
+- **Platforms** – Maintained installers for Debian (`.deb`), Fedora (`.rpm`), and Windows (`.msi`/`.zip`) publish automatically whenever a `v*` tag lands.
+- **Maintainer note** – Follow `docs/release-guide.md` when preparing a new version or rotating signing keys.
 
 ## Roadmap snapshot
 

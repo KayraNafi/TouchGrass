@@ -1,9 +1,20 @@
 ## Open Bugs
 
-- **Window minimize does not hide application in production**
-  - **Status:** Solved
-  - **Platforms:** Desktop build
-  - **Details:** Fixed by implementing `WindowEvent::CloseRequested` handler that intercepts close button clicks and hides the window to tray instead of closing.
+- **Window minimize does not hide application to tray in production**
+  - **Status:** Partially Solved (Close button works, Minimize button doesn't)
+  - **Platforms:** Desktop build (KDE Plasma on Wayland/X11)
+  - **Details:**
+    - **Close button:** Fixed by implementing `WindowEvent::CloseRequested` handler that intercepts close button clicks and hides the window to tray instead of closing.
+    - **Minimize button:** Cannot be intercepted on KDE - this is a fundamental limitation of how Tauri/Winit interact with KDE's window manager (KWin).
+  - **Root Cause:**
+    - No `MinimizeRequested` event exists in Tauri/Winit
+    - Window state queries (`is_minimized()`, `is_visible()`) return incorrect values on KDE Wayland/X11
+    - KWin handles minimize action directly without properly notifying the application through Wayland protocol
+    - Only generic events fire (`Focused(false)`, `Moved`, `Resized`) which also occur during normal window interactions
+  - **Potential Solutions (for KDE specialist):**
+    - Check if KWin exposes minimize events through Wayland protocols (e.g., `xdg-toplevel` state changes)
+    - Explore KDE-specific Wayland protocols or D-Bus signals to intercept minimize
+    - Investigate compositor-specific APIs to catch minimize button clicks before KWin handles them
 
 - **Inactivity detection fails to suppress reminders**
   - **Status:** Solved
@@ -16,15 +27,17 @@
     - **macOS:** Uses `user-idle2` crate (native macOS idle detection APIs)
   - **Implementation:** Event-based Wayland detection runs in dedicated thread, seamlessly falls back to polling-based detection on other platforms
 
-- **Latest Nudge label never clears**  
-  - **Status:** Open  
-  - **Platforms:** Desktop build  
-  - **Details:** The “Latest Nudge” section keeps showing the most recent message indefinitely instead of expiring once the reminder window passes.
+- **Latest Nudge label never clears**
+  - **Status:** Solved (removed feature)
+  - **Platforms:** Desktop build
+  - **Details:** The "Latest Nudge" section kept showing the most recent message indefinitely instead of expiring once the reminder window passed.
+  - **Fix:** Removed the "Latest Nudge" section entirely as it was redundant with the "Last break" display. Added real-time updates (every 10 seconds) to all time-based displays including "Next reminder" and "Last break".
 
-- **Notification styling feels unpolished**  
-  - **Status:** Open  
-  - **Platforms:** Desktop build  
-  - **Details:** Reminder notifications still use the default system styling with minimal branding. Explore richer layouts (custom icon, large body copy, action buttons) while remaining consistent with the OS look and feel.
+- **Notification styling feels unpolished**
+  - **Status:** Solved
+  - **Platforms:** Desktop build
+  - **Details:** Reminder notifications were using the default system styling with minimal branding.
+  - **Fix:** Added the TouchGrass app icon to notifications using the default window icon. The icon now appears alongside the notification title and body, improving brand recognition and visual polish while maintaining consistency with the OS native notification style.
 
 
 

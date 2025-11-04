@@ -33,8 +33,6 @@
   let isLoading = $state(true);
   let pending = $state(false);
   let toastMessage = $state<string | null>(null);
-  let lastReminderMessage = $state<string | null>(null);
-  let lastReminderAt = $state<Date | null>(null);
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
   let updateChecking = $state(false);
   let updateInstalling = $state(false);
@@ -69,8 +67,14 @@
   let audioContext: AudioContext | null = null;
   let unlistenStatus: UnlistenFn | null = null;
   let unlistenReminder: UnlistenFn | null = null;
+  let realtimeUpdateInterval: ReturnType<typeof setInterval> | null = null;
+  let realtimeTick = $state(0); // Used to trigger reactive updates for time displays
 
   onMount(async () => {
+    // Update every 10 seconds to refresh relative times
+    realtimeUpdateInterval = setInterval(() => {
+      realtimeTick++;
+    }, 10000);
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(LIGHT_MODE_WARNING_KEY);
       lightModeWarningAcknowledged = stored === "true";
@@ -88,6 +92,9 @@
     unlistenReminder?.();
     if (toastTimeout) {
       clearTimeout(toastTimeout);
+    }
+    if (realtimeUpdateInterval) {
+      clearInterval(realtimeUpdateInterval);
     }
     if (pendingUpdate) {
       pendingUpdate.close().catch((error) => {
@@ -179,8 +186,6 @@
   }
 
   function handleReminder(payload: ReminderEvent) {
-    lastReminderMessage = payload.message;
-    lastReminderAt = new Date();
     if (payload.soundEnabled) {
       playChime();
     }
@@ -391,6 +396,9 @@
   }
 
   function formatNextLabel(): string {
+    // Depend on realtimeTick for live updates
+    void realtimeTick;
+
     if (!status) return "Loading…";
     if (status.paused) return "Paused";
     if (status.snoozedUntil) {
@@ -403,6 +411,9 @@
   }
 
   function formatLastLabel(): string {
+    // Depend on realtimeTick for live updates
+    void realtimeTick;
+
     if (!status || !status.lastNotificationAt) return "Not yet";
     const last = parseDate(status.lastNotificationAt);
     return `${formatRelative(last)} (${formatClock(last)})`;
@@ -415,13 +426,6 @@
     if (minutes === 1) return "Idle for 1 minute";
     return `Idle for ${minutes} minutes`;
   }
-
-  function lastNudgeDate(): Date | null {
-    if (lastReminderAt) return lastReminderAt;
-    return parseDate(status?.lastNotificationAt ?? null);
-  }
-
-  const lastNudge = $derived(lastNudgeDate());
 
   function isSnoozedActive(): boolean {
     if (!status?.snoozedUntil) return false;
@@ -539,19 +543,6 @@
         <div class="summary__line">
           <span class="summary__label">Last break</span>
           <span class="summary__value">{formatLastLabel()}</span>
-        </div>
-      </div>
-
-      <div class="summary__item summary__item--highlight">
-        <div class="summary__line">
-          <span class="summary__label">Latest nudge</span>
-          <span class="summary__value summary__value--small">
-            {#if lastNudge}
-              {formatRelative(lastNudge)} ({formatClock(lastNudge)})
-            {:else}
-              Not yet
-            {/if}
-          </span>
         </div>
       </div>
     </div>
@@ -893,11 +884,6 @@
   border: 1px solid var(--tg-color-border-soft);
 }
 
-.summary__item--highlight {
-  border: 1px solid rgba(45, 134, 89, 0.35);
-  background: rgba(45, 134, 89, 0.12);
-}
-
 .summary__line {
   display: flex;
   align-items: baseline;
@@ -926,10 +912,6 @@
   text-align: right;
   white-space: nowrap;
   margin-left: auto;
-}
-
-.summary__value--small {
-  font-size: 0.9rem;
 }
 
 .summary__meta {

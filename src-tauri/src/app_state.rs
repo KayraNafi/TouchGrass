@@ -582,11 +582,51 @@ where
 
 async fn send_reminder(app: &AppHandle<Wry>, prefs: &Preferences) {
     let message = choose_reminder_message();
+
+    // Try multiple icon paths
+    let icon_path = [
+        // Try from Cargo manifest directory (dev mode - this is src-tauri/)
+        std::env::var("CARGO_MANIFEST_DIR")
+            .ok()
+            .map(|dir| std::path::PathBuf::from(dir).join("icons/128x128.png")),
+        // Try resource directory (production)
+        app.path()
+            .resource_dir()
+            .ok()
+            .map(|d| d.join("icons/128x128.png")),
+        // Try relative to current working directory
+        Some(std::path::PathBuf::from("src-tauri/icons/128x128.png")),
+        // Try from current executable directory
+        std::env::current_exe().ok().and_then(|exe| {
+            let icon = exe.parent()?.join("icons/128x128.png");
+            Some(icon)
+        }),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|p| {
+        let exists = p.exists();
+        if exists {
+            eprintln!("TouchGrass: Found icon at: {}", p.display());
+        }
+        exists
+    })
+    .and_then(|p| p.canonicalize().ok())
+    .map(|p| p.to_string_lossy().to_string())
+    .unwrap_or_else(|| {
+        eprintln!("TouchGrass: No icon found, using fallback 'touchgrass'");
+        "touchgrass".to_string()
+    });
+
+    eprintln!("TouchGrass: Using notification icon path: {}", icon_path);
+
+    // Build notification with app icon
     let notification_result = app
         .notification()
         .builder()
         .title("TouchGrass")
         .body(message.clone())
+        .icon(icon_path)
         .show();
 
     if let Err(err) = notification_result {

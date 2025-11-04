@@ -14,9 +14,9 @@
       {
         "title": "TouchGrass",
         "width": 840,
-        "height": 920,
+        "height": 850,
         "minWidth": 720,
-        "minHeight": 800,
+        "minHeight": 850,
         "decorations": true,
         "transparent": false,
         "skipTaskbar": false
@@ -37,6 +37,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "icons/128x128.png"
     ]
   },
   "plugins": {

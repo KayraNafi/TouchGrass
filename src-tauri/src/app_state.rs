@@ -56,7 +56,7 @@ impl Default for Preferences {
             interval_minutes: DEFAULT_INTERVAL_MINUTES,
             activity_detection: true,
             sound_enabled: true,
-            autostart_enabled: false,
+            autostart_enabled: true, // Enable by default for automatic reminders
             theme: ThemeMode::Dark,
             idle_threshold_minutes: DEFAULT_IDLE_THRESHOLD_MINUTES,
         }

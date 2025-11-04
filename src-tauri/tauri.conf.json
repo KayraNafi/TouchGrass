@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TouchGrass",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "identifier": "app.touchgrass.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -29,6 +29,7 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
+    "shortDescription": "Micro-break reminders that nudge you to step away.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -43,7 +44,7 @@
       "endpoints": [
         "https://github.com/KayraNafi/TouchGrass/releases/latest/download/latest.json"
       ],
-      "pubkey": "$env(TOUCHGRASS_UPDATER_PUBKEY)"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU2QTJEQTI5RUEzOUUwRkYKUldULzREbnFLZHFpVnZxUDlqRUFiVkRiQk9rTVZiS29jVjhYd1gzUjdyWWY1S05vd1lKdnRnWDQK"
     }
   }
 }

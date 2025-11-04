@@ -115,10 +115,19 @@ pub fn run() {
                 return;
             }
 
-            if let WindowEvent::Resized(_) = event {
-                if let Ok(true) = window.is_minimized() {
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    // Prevent the window from closing, hide it instead
+                    api.prevent_close();
                     let _ = window.hide();
                 }
+                WindowEvent::Resized(_) => {
+                    // Also handle minimize button (fallback for platforms that emit this)
+                    if let Ok(true) = window.is_minimized() {
+                        let _ = window.hide();
+                    }
+                }
+                _ => {}
             }
         })
         .on_tray_icon_event(|app, event| {

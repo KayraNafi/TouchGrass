@@ -1,9 +1,9 @@
 ## Open Bugs
 
-- **Window minimize does not hide application in production**  
-  - **Status:** Open  
-  - **Platforms:** Desktop build  
-  - **Details:** The packaged build still keeps the main window visible after minimizing. Current handler listens for `WindowEvent::Resized` and `WindowEvent::Focused(false)`, yet the bundled app does not emit a matching event. Needs a reliable minimize signal that works across build modes.
+- **Window minimize does not hide application in production**
+  - **Status:** Solved
+  - **Platforms:** Desktop build
+  - **Details:** Fixed by implementing `WindowEvent::CloseRequested` handler that intercepts close button clicks and hides the window to tray instead of closing.
 
 - **Inactivity detection fails to suppress reminders**  
   - **Status:** Open  

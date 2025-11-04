@@ -215,7 +215,7 @@
   function handleCustomIntervalChange(value: number) {
     if (!preferences || pending) return;
     if (Number.isNaN(value)) return;
-    const clamped = Math.min(Math.max(value, 5), 240);
+    const clamped = Math.min(Math.max(value, 2), 240);
     customInterval = clamped;
     applyPreference({ intervalMinutes: clamped });
   }
@@ -631,7 +631,7 @@
           <input
             id="custom-interval"
             type="number"
-            min="5"
+            min="2"
             max="240"
             placeholder="min"
             value={customInterval ?? ""}

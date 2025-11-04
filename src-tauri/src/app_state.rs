@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant, MissedTickBehavior};
-use user_idle2::UserIdle;
 
 use tauri::{
     async_runtime::{self, JoinHandle},
@@ -18,7 +17,7 @@ use tauri::{
 };
 use tauri_plugin_notification::NotificationExt;
 
-use crate::{events, tray::TrayState};
+use crate::{events, idle_detection::IdleDetector, tray::TrayState};
 
 const PREFERENCES_FILE: &str = "preferences.json";
 const DEFAULT_IDLE_THRESHOLD_MINUTES: u64 = 2;
@@ -165,7 +164,7 @@ impl AppState {
         let mut prefs = self.preferences.lock().unwrap().clone();
 
         if let Some(interval) = update.interval_minutes {
-            prefs.interval_minutes = interval.clamp(5, 240);
+            prefs.interval_minutes = interval.clamp(2, 240);
         }
         if let Some(activity_detection) = update.activity_detection {
             prefs.activity_detection = activity_detection;
@@ -256,9 +255,7 @@ fn load_preferences(path: &Path) -> Result<Preferences, AppStateError> {
     match serde_json::from_str::<Preferences>(&contents) {
         Ok(prefs) => Ok(prefs),
         Err(err) => {
-            eprintln!(
-                "TouchGrass: preferences.json was invalid ({err}); restoring defaults."
-            );
+            eprintln!("TouchGrass: preferences.json was invalid ({err}); restoring defaults.");
             backup_corrupt_preferences(path);
             let defaults = Preferences::default();
             save_preferences(path, &defaults)?;
@@ -293,9 +290,7 @@ fn backup_corrupt_preferences(path: &Path) {
             backup_path.display()
         ),
         Err(err) => {
-            eprintln!(
-                "TouchGrass: failed to backup corrupt preferences ({err}); removing file."
-            );
+            eprintln!("TouchGrass: failed to backup corrupt preferences ({err}); removing file.");
             let _ = fs::remove_file(path);
         }
     }
@@ -342,6 +337,8 @@ async fn run_engine(
 ) {
     apply_autostart(&app, prefs.autostart_enabled);
 
+    let idle_detector = IdleDetector::new(prefs.idle_threshold_secs());
+
     let mut paused = false;
     let mut snoozed_until: Option<DateTime<Utc>> = None;
     let mut next_instant = Instant::now() + prefs.interval_duration();
@@ -377,8 +374,7 @@ async fn run_engine(
                 }
 
                 if notify_user && prefs.activity_detection {
-                    if let Ok(idle) = UserIdle::get_time() {
-                        let secs = idle.as_seconds();
+                    if let Ok(secs) = idle_detector.get_idle_time() {
                         last_idle_secs = Some(secs);
                         if secs >= idle_threshold_secs {
                             notify_user = false;
@@ -418,8 +414,7 @@ async fn run_engine(
             }
             _ = idle_poll.tick() => {
                 if prefs.activity_detection {
-                    if let Ok(idle) = UserIdle::get_time() {
-                        let secs = idle.as_seconds();
+                    if let Ok(secs) = idle_detector.get_idle_time() {
                         last_idle_secs = Some(secs);
                         let idle_now = secs >= prefs.idle_threshold_secs();
                         let mut updated_next = false;

@@ -1,5 +1,6 @@
 mod app_state;
 mod events;
+mod idle_detection;
 mod tray;
 
 use std::sync::Arc;

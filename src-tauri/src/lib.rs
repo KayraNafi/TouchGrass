@@ -96,6 +96,17 @@ pub fn run() {
 
             tray::setup_tray(&app_handle, tray_state).map_err(|e| boxed(e))?;
 
+            // Check if launched with --autostart flag (from login)
+            let args: Vec<String> = std::env::args().collect();
+            let is_autostart = args.iter().any(|arg| arg == "--autostart");
+
+            if is_autostart {
+                // Hide window on autostart - run in tray only
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+
             // Emit initial status for UI bootstrap.
             let _ = app.emit(
                 events::STATUS_EVENT,

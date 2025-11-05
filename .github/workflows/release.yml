@@ -27,7 +27,12 @@ jobs:
       - name: Decode Tauri private key
         run: |
           echo "${{ secrets.TAURI_PRIVATE_KEY }}" | base64 -d > /tmp/tauri_key
-          echo "TAURI_SIGNING_PRIVATE_KEY=$(cat /tmp/tauri_key)" >> $GITHUB_ENV
+          {
+            echo 'TAURI_SIGNING_PRIVATE_KEY<<EOF'
+            cat /tmp/tauri_key
+            echo 'EOF'
+          } >> $GITHUB_ENV
+          echo /tmp/tauri_key
           rm /tmp/tauri_key
 
       - name: Install system dependencies
@@ -131,7 +136,11 @@ jobs:
       - name: Decode Tauri private key
         run: |
           echo "${{ secrets.TAURI_PRIVATE_KEY }}" | base64 -d > /tmp/tauri_key
-          echo "TAURI_SIGNING_PRIVATE_KEY=$(cat /tmp/tauri_key)" >> $GITHUB_ENV
+          {
+            echo 'TAURI_SIGNING_PRIVATE_KEY<<EOF'
+            cat /tmp/tauri_key
+            echo 'EOF'
+          } >> $GITHUB_ENV
           rm /tmp/tauri_key
 
       - name: Set up Rust
@@ -176,7 +185,9 @@ jobs:
         shell: pwsh
         run: |
           $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${{ secrets.TAURI_PRIVATE_KEY }}"))
-          echo "TAURI_SIGNING_PRIVATE_KEY=$decoded" >> $env:GITHUB_ENV
+          Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY<<EOF"
+          Add-Content -Path $env:GITHUB_ENV -Value $decoded
+          Add-Content -Path $env:GITHUB_ENV -Value "EOF"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

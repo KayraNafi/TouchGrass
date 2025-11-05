@@ -24,11 +24,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup signing key
-        run: |
-          echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | base64 -d > /tmp/signing.key
-          echo "TAURI_SIGNING_PRIVATE_KEY=$(cat /tmp/signing.key)" >> $GITHUB_ENV
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -109,11 +104,6 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Setup signing key
-        run: |
-          echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | base64 -d > /tmp/signing.key
-          echo "TAURI_SIGNING_PRIVATE_KEY=$(cat /tmp/signing.key)" >> $GITHUB_ENV
-
       - name: Install system dependencies
         run: |
           dnf -y update
@@ -169,14 +159,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup signing key
-        shell: pwsh
-        run: |
-          $bytes = [System.Convert]::FromBase64String("${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}")
-          $key = [System.Text.Encoding]::UTF8.GetString($bytes)
-          echo "TAURI_SIGNING_PRIVATE_KEY=$key" >> $env:GITHUB_ENV
-
+        
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

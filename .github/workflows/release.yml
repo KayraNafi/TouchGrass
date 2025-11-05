@@ -45,7 +45,10 @@ jobs:
             libxrandr-dev \
             libxss-dev \
             libdbus-1-dev \
-            patchelf
+            patchelf \
+            libfuse2 \
+            squashfs-tools \
+            zsync
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -80,13 +83,19 @@ jobs:
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
       - name: Build Debian package
-        run: pnpm tauri build --bundles deb
+        run: pnpm tauri build --bundles deb --bundles appimage
 
       - name: Upload Debian artifact
         uses: actions/upload-artifact@v4
         with:
           name: touchgrass-deb-${{ github.ref_name }}
           path: src-tauri/target/release/bundle/deb/*.deb
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: touchgrass-appimage-${{ github.ref_name }}
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
 
       - name: Upload updater manifest (Debian)
         uses: actions/upload-artifact@v4
@@ -114,7 +123,8 @@ jobs:
             libappindicator-gtk3-devel libayatana-appindicator-gtk3-devel \
             libXScrnSaver-devel dbus-devel patchelf rpm-build \
             libX11-devel libxdo-devel libxcb-devel libXrandr-devel \
-            pkgconfig nodejs npm gcc make
+            pkgconfig nodejs npm gcc make \
+            squashfs-tools zsync
 
       - name: Set up pnpm
         run: npm install -g pnpm@${PNPM_VERSION}
@@ -139,7 +149,7 @@ jobs:
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
       - name: Build RPM package
-        run: pnpm tauri build --bundles rpm
+        run: pnpm tauri build --bundles rpm --bundles appimage
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
@@ -270,6 +280,8 @@ jobs:
             artifacts/**/*.deb
             artifacts/**/*.rpm
             artifacts/**/*.msi
+            artifacts/**/*.AppImage
+            artifacts/**/*.AppImage.tar.gz
             artifacts/**/*.zip
             artifacts/merged/latest.json
         env:

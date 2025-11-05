@@ -32,7 +32,7 @@ jobs:
             cat /tmp/tauri_key
             echo 'EOF'
           } >> $GITHUB_ENV
-          echo /tmp/tauri_key
+          cat /tmp/tauri_key
           rm /tmp/tauri_key
 
       - name: Install system dependencies

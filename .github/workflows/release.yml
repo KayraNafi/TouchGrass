@@ -16,7 +16,6 @@ jobs:
     name: Build Debian package
     runs-on: ubuntu-latest
     env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     defaults:
       run:
@@ -24,6 +23,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Decode signing key
+        run: echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | base64 -d > /tmp/tauri-signing-key.key
+
+      - name: Set signing key environment variable
+        run: echo "TAURI_SIGNING_PRIVATE_KEY=$(cat /tmp/tauri-signing-key.key)" >> $GITHUB_ENV
 
       - name: Install system dependencies
         run: |
@@ -100,12 +105,17 @@ jobs:
     container:
       image: fedora:40
     env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     defaults:
       run:
         shell: bash
     steps:
+      - name: Decode signing key
+        run: echo "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | base64 -d > /tmp/tauri-signing-key.key
+
+      - name: Set signing key environment variable
+        run: echo "TAURI_SIGNING_PRIVATE_KEY=$(cat /tmp/tauri-signing-key.key)" >> $GITHUB_ENV
+
       - name: Install system dependencies
         run: |
           dnf -y update
@@ -157,11 +167,22 @@ jobs:
     name: Build Windows installer
     runs-on: windows-latest
     env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Decode signing key
+        shell: pwsh
+        run: |
+          $key = [System.Convert]::FromBase64String("${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}")
+          [System.IO.File]::WriteAllBytes("$env:TEMP\tauri-signing-key.key", $key)
+
+      - name: Set signing key environment variable
+        shell: pwsh
+        run: |
+          $key = Get-Content "$env:TEMP\tauri-signing-key.key" -Raw
+          echo "TAURI_SIGNING_PRIVATE_KEY=$key" >> $env:GITHUB_ENV
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-      TOUCHGRASS_UPDATER_PUBKEY: ${{ secrets.TOUCHGRASS_UPDATER_PUBKEY }}
     defaults:
       run:
         shell: bash
@@ -107,7 +106,6 @@ jobs:
       image: fedora:40
     env:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-      TOUCHGRASS_UPDATER_PUBKEY: ${{ secrets.TOUCHGRASS_UPDATER_PUBKEY }}
     defaults:
       run:
         shell: bash
@@ -170,7 +168,6 @@ jobs:
     runs-on: windows-latest
     env:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-      TOUCHGRASS_UPDATER_PUBKEY: ${{ secrets.TOUCHGRASS_UPDATER_PUBKEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

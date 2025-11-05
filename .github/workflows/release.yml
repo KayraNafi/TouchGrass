@@ -16,24 +16,14 @@ jobs:
     name: Build Debian package
     runs-on: ubuntu-latest
     env:
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     defaults:
       run:
         shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Decode Tauri private key
-        run: |
-          echo "${{ secrets.TAURI_PRIVATE_KEY }}" | base64 -d > /tmp/tauri_key
-          {
-            echo 'TAURI_SIGNING_PRIVATE_KEY<<EOF'
-            cat /tmp/tauri_key
-            echo 'EOF'
-          } >> $GITHUB_ENV
-          cat /tmp/tauri_key
-          rm /tmp/tauri_key
 
       - name: Install system dependencies
         run: |
@@ -110,7 +100,8 @@ jobs:
     container:
       image: fedora:40
     env:
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     defaults:
       run:
         shell: bash
@@ -132,16 +123,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Decode Tauri private key
-        run: |
-          echo "${{ secrets.TAURI_PRIVATE_KEY }}" | base64 -d > /tmp/tauri_key
-          {
-            echo 'TAURI_SIGNING_PRIVATE_KEY<<EOF'
-            cat /tmp/tauri_key
-            echo 'EOF'
-          } >> $GITHUB_ENV
-          rm /tmp/tauri_key
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -176,18 +157,11 @@ jobs:
     name: Build Windows installer
     runs-on: windows-latest
     env:
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Decode Tauri private key
-        shell: pwsh
-        run: |
-          $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${{ secrets.TAURI_PRIVATE_KEY }}"))
-          Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY<<EOF"
-          Add-Content -Path $env:GITHUB_ENV -Value $decoded
-          Add-Content -Path $env:GITHUB_ENV -Value "EOF"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4

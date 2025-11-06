@@ -726,49 +726,6 @@
 
     <section class="card">
       <div class="preferences">
-        <label class="toggle with-help" data-help="Skip reminders when you have been idle for ~2 minutes.">
-          <span class="toggle__label">Activity detection</span>
-          <input
-            type="checkbox"
-            checked={preferences?.activityDetection}
-            onchange={(event) => toggleActivityDetection(event.currentTarget.checked)}
-            disabled={pending || isLoading}
-          />
-          <span
-            class="toggle__visual"
-            data-active={preferences?.activityDetection}
-          ></span>
-        </label>
-
-        <label class="toggle with-help" data-help="Play a soft tone alongside notifications.">
-          <span class="toggle__label">Chime when reminding</span>
-          <input
-            type="checkbox"
-            checked={preferences?.soundEnabled}
-            onchange={(event) => toggleSound(event.currentTarget.checked)}
-            disabled={pending || isLoading}
-          />
-          <span class="toggle__visual" data-active={preferences?.soundEnabled}></span>
-        </label>
-
-        <div
-          class="metric-row with-help"
-          data-help="When you’re idle at least this long, the timer restarts once you return."
-        >
-          <span class="metric-row__label">Break resets after</span>
-          <div class="metric-row__input">
-            <input
-              type="number"
-              min="1"
-              max="30"
-              value={preferences?.idleThresholdMinutes ?? 2}
-              onchange={(event) => setIdleThreshold(parseInt(event.currentTarget.value, 10))}
-              disabled={pending || isLoading}
-            />
-            <span>min</span>
-          </div>
-        </div>
-
         <label
           class="toggle with-help"
           data-help="Start TouchGrass quietly whenever you sign in."
@@ -785,6 +742,51 @@
             data-active={preferences?.autostartEnabled}
           ></span>
         </label>
+
+        <label class="toggle with-help" data-help="Play a soft tone alongside notifications.">
+          <span class="toggle__label">Chime when reminding</span>
+          <input
+            type="checkbox"
+            checked={preferences?.soundEnabled}
+            onchange={(event) => toggleSound(event.currentTarget.checked)}
+            disabled={pending || isLoading}
+          />
+          <span class="toggle__visual" data-active={preferences?.soundEnabled}></span>
+        </label>
+
+        <label class="toggle with-help" data-help="Skip reminders when you have been idle for ~2 minutes.">
+          <span class="toggle__label">Activity detection</span>
+          <input
+            type="checkbox"
+            checked={preferences?.activityDetection}
+            onchange={(event) => toggleActivityDetection(event.currentTarget.checked)}
+            disabled={pending || isLoading}
+          />
+          <span
+            class="toggle__visual"
+            data-active={preferences?.activityDetection}
+          ></span>
+        </label>
+
+        <div
+          class="metric-row with-help"
+          data-help="When you’re idle at least this long, the timer restarts once you return. Activity detection must be on."
+          data-disabled={!preferences?.activityDetection}
+        >
+          <span class="metric-row__label">Break resets after</span>
+          <div class="metric-row__input">
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={preferences?.idleThresholdMinutes ?? 2}
+              onchange={(event) => setIdleThreshold(parseInt(event.currentTarget.value, 10))}
+              disabled={pending || isLoading || !preferences?.activityDetection}
+            />
+            <span>min</span>
+          </div>
+        </div>
+
       </div>
     </section>
   </section>
@@ -1287,6 +1289,12 @@
 .metric-row__input span {
   font-size: 0.8rem;
   color: var(--tg-color-text-soft);
+}
+
+.metric-row[data-disabled="true"] .metric-row__label,
+.metric-row[data-disabled="true"] .metric-row__input,
+.metric-row[data-disabled="true"] .metric-row__input span {
+  opacity: 0.6;
 }
 
 .button {

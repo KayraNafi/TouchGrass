@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { relaunch } from "@tauri-apps/plugin-process";
@@ -63,6 +63,10 @@
     (_minutes: number) => "Okay, future-you will handle it.",
   ] as const;
   let lightModeWarningAcknowledged = $state(false);
+  let lightModeDialogOpen = $state(false);
+  let lightModeDialogMessage = $state("");
+  let lightModeToggleTarget: HTMLInputElement | null = null;
+  let lightModeConfirmButton = $state<HTMLButtonElement | null>(null);
 
   let audioContext: AudioContext | null = null;
   let unlistenStatus: UnlistenFn | null = null;
@@ -337,20 +341,67 @@
     if (!input) return;
     const revertChecked = preferences.theme !== "light";
     const nextTheme = input.checked ? "dark" : "light";
+    const shouldRemainChecked = nextTheme !== "light";
 
     if (nextTheme === "light") {
-      const confirmed = window.confirm(randomLightModeMessage());
-      if (!confirmed) {
-        input.checked = revertChecked;
-        return;
-      }
-      if (!lightModeWarningAcknowledged) {
-        markLightModeWarningAcknowledged();
-      }
+      input.checked = revertChecked;
+      await openLightModeDialog(input);
+      return;
     }
 
-    input.checked = nextTheme !== "light";
+    input.checked = shouldRemainChecked;
     await setTheme(nextTheme);
+  }
+
+  async function openLightModeDialog(input: HTMLInputElement) {
+    lightModeToggleTarget = input;
+    lightModeDialogMessage = randomLightModeMessage();
+    lightModeDialogOpen = true;
+    await tick();
+    lightModeConfirmButton?.focus();
+  }
+
+  function closeLightModeDialog(refocus = false) {
+    if (refocus && lightModeToggleTarget) {
+      lightModeToggleTarget.focus();
+    }
+    lightModeDialogOpen = false;
+    lightModeDialogMessage = "";
+    lightModeToggleTarget = null;
+  }
+
+  function cancelLightModeDialog() {
+    if (lightModeToggleTarget) {
+      lightModeToggleTarget.checked = true;
+    }
+    closeLightModeDialog(true);
+  }
+
+  async function confirmLightModeDialog() {
+    if (!preferences) {
+      closeLightModeDialog();
+      return;
+    }
+    if (lightModeToggleTarget) {
+      lightModeToggleTarget.checked = false;
+    }
+    if (!lightModeWarningAcknowledged) {
+      markLightModeWarningAcknowledged();
+    }
+    lightModeDialogOpen = false;
+    const input = lightModeToggleTarget;
+    lightModeDialogMessage = "";
+    lightModeToggleTarget = null;
+    await setTheme("light");
+    input?.focus();
+  }
+
+  function handleLightModeDialogKeydown(event: KeyboardEvent) {
+    if (!lightModeDialogOpen) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelLightModeDialog();
+    }
   }
 
   async function setIdleThreshold(minutes: number) {
@@ -557,6 +608,8 @@
     }
   });
 </script>
+
+<svelte:window on:keydown={handleLightModeDialogKeydown} />
 
 <main class="app">
   <header class="top">
@@ -794,6 +847,51 @@
   <footer class="footer">
     <p>TouchGrass runs offline and lives in your tray when you need it.</p>
   </footer>
+
+  {#if lightModeDialogOpen}
+    <div class="light-mode-dialog">
+      <div
+        class="light-mode-dialog__backdrop"
+        onclick={cancelLightModeDialog}
+        aria-hidden="true"
+      ></div>
+      <div
+        class="light-mode-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="light-mode-dialog-title"
+        aria-describedby="light-mode-dialog-copy"
+      >
+        <div class="light-mode-dialog__icon" aria-hidden="true">☀️</div>
+        <div class="light-mode-dialog__content">
+          <h2 id="light-mode-dialog-title">Invite the daylight in?</h2>
+          <p class="light-mode-dialog__headline">{lightModeDialogMessage}</p>
+          <p id="light-mode-dialog-copy" class="light-mode-dialog__copy">
+            Light mode brightens panels and softens shadows. You can see how it feels and
+            flip the switch back anytime.
+          </p>
+        </div>
+        <div class="light-mode-dialog__actions">
+          <button
+            type="button"
+            class="button button--ghost light-mode-dialog__button"
+            onclick={cancelLightModeDialog}
+          >
+            Stay in dark
+          </button>
+          <button
+            type="button"
+            class="button button--primary light-mode-dialog__button"
+            bind:this={lightModeConfirmButton}
+            onclick={confirmLightModeDialog}
+            disabled={pending}
+          >
+            Embrace the light
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   {#if toastMessage}
     <div class="toast">{toastMessage}</div>
@@ -1354,6 +1452,121 @@
   padding-top: 0.75rem;
 }
 
+.light-mode-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: clamp(1.5rem, 6vw, 3rem);
+  pointer-events: none;
+}
+
+.light-mode-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 12, 9, 0.6);
+  backdrop-filter: blur(8px);
+  transition: opacity 0.2s ease;
+  pointer-events: auto;
+}
+
+:root[data-theme="light"] .light-mode-dialog__backdrop {
+  background: rgba(238, 244, 241, 0.7);
+}
+
+.light-mode-dialog__panel {
+  position: relative;
+  width: min(420px, 100%);
+  border-radius: var(--tg-radius-lg);
+  border: 1px solid var(--tg-color-border-strong);
+  background: var(--tg-color-surface);
+  box-shadow: 0 28px 65px rgba(0, 0, 0, 0.45);
+  padding: 2rem clamp(1.5rem, 5vw, 2.1rem) 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+:root[data-theme="light"] .light-mode-dialog__panel {
+  box-shadow: 0 28px 60px rgba(26, 58, 82, 0.18);
+}
+
+.light-mode-dialog__panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    145deg,
+    rgba(168, 213, 186, 0.09),
+    rgba(45, 134, 89, 0.13) 45%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.light-mode-dialog__icon {
+  position: relative;
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 1.9rem;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 214, 120, 0.55), rgba(255, 214, 120, 0.08));
+  color: #ffe08a;
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 120, 0.18);
+}
+
+.light-mode-dialog__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.light-mode-dialog__content h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.light-mode-dialog__headline {
+  margin: 0;
+  font-weight: 600;
+  color: var(--tg-color-text);
+  font-size: 1rem;
+}
+
+.light-mode-dialog__copy {
+  margin: 0;
+  color: var(--tg-color-text-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.light-mode-dialog__actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.light-mode-dialog__button {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.light-mode-dialog__button.button--ghost {
+  color: var(--tg-color-text);
+}
+
 .toast {
   position: fixed;
   bottom: 1.75rem;
@@ -1437,6 +1650,23 @@
     left: 50%;
     right: auto;
     transform: translateX(-50%);
+  }
+
+  .light-mode-dialog {
+    padding: 1.5rem;
+  }
+
+  .light-mode-dialog__panel {
+    padding: 1.7rem 1.45rem 1.4rem;
+    gap: 1rem;
+  }
+
+  .light-mode-dialog__actions {
+    flex-direction: column-reverse;
+  }
+
+  .light-mode-dialog__button {
+    width: 100%;
   }
 }
 </style>

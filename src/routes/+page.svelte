@@ -170,19 +170,109 @@
     }
 
     const now = ctx.currentTime;
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
 
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, now);
+    // Build a layered chime with three partials and a soft echo tail.
+    const outputGain = ctx.createGain();
+    outputGain.gain.setValueAtTime(0.0001, now);
+    outputGain.gain.linearRampToValueAtTime(0.55, now + 0.05);
+    outputGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
 
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+    const dryGain = ctx.createGain();
+    dryGain.gain.setValueAtTime(0.85, now);
+    outputGain.connect(dryGain).connect(ctx.destination);
 
-    oscillator.connect(gain).connect(ctx.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 1.1);
+    const wetGain = ctx.createGain();
+    wetGain.gain.setValueAtTime(0.32, now);
+
+    const delay = ctx.createDelay(1.5);
+    delay.delayTime.setValueAtTime(0.24, now);
+
+    const delayFilter = ctx.createBiquadFilter();
+    delayFilter.type = "lowpass";
+    delayFilter.frequency.setValueAtTime(3200, now);
+
+    const delayFeedback = ctx.createGain();
+    delayFeedback.gain.setValueAtTime(0.28, now);
+
+    outputGain.connect(delay);
+    delay.connect(delayFilter);
+    delayFilter.connect(delayFeedback);
+    delayFeedback.connect(delay);
+    delay.connect(wetGain).connect(ctx.destination);
+
+    type ToneSpec = {
+      frequency: number;
+      startOffset: number;
+      duration: number;
+      peakGain: number;
+      type?: OscillatorType;
+    };
+
+    const tones: ToneSpec[] = [
+      { frequency: 659.25, startOffset: 0, duration: 1.8, peakGain: 0.22, type: "triangle" },
+      { frequency: 880, startOffset: 0.05, duration: 1.6, peakGain: 0.18, type: "sine" },
+      { frequency: 1174.66, startOffset: 0.12, duration: 1.2, peakGain: 0.12, type: "sine" },
+    ];
+
+    const releaseDuration =
+      Math.max(...tones.map((tone) => tone.startOffset + tone.duration)) + 0.8;
+
+    tones.forEach((tone) => {
+      const startTime = now + tone.startOffset;
+      const stopTime = startTime + tone.duration + 0.25;
+
+      const osc = ctx.createOscillator();
+      osc.type = tone.type ?? "sine";
+      osc.frequency.setValueAtTime(tone.frequency * 0.985, startTime);
+      osc.frequency.exponentialRampToValueAtTime(
+        tone.frequency,
+        startTime + 0.35,
+      );
+
+      const vibrato = ctx.createOscillator();
+      vibrato.type = "sine";
+      vibrato.frequency.setValueAtTime(4.5, startTime);
+      const vibratoDepth = ctx.createGain();
+      vibratoDepth.gain.setValueAtTime(10, startTime); // cents
+      vibrato.connect(vibratoDepth).connect(osc.detune);
+
+      const toneGain = ctx.createGain();
+      toneGain.gain.setValueAtTime(0.0001, startTime);
+      toneGain.gain.exponentialRampToValueAtTime(
+        tone.peakGain,
+        startTime + 0.06,
+      );
+      toneGain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        startTime + tone.duration,
+      );
+
+      osc.connect(toneGain).connect(outputGain);
+
+      osc.start(startTime);
+      vibrato.start(startTime);
+      osc.stop(stopTime);
+      vibrato.stop(stopTime);
+      osc.onended = () => {
+        osc.disconnect();
+        toneGain.disconnect();
+      };
+      vibrato.onended = () => {
+        vibrato.disconnect();
+        vibratoDepth.disconnect();
+      };
+    });
+
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        outputGain.disconnect();
+        dryGain.disconnect();
+        wetGain.disconnect();
+        delay.disconnect();
+        delayFilter.disconnect();
+        delayFeedback.disconnect();
+      }, releaseDuration * 1000);
+    }
   }
 
   function handleReminder(payload: ReminderEvent) {

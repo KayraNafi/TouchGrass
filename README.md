@@ -1,55 +1,55 @@
 # TouchGrass
 
-> "Go touch grass." · "Micro-breaks, macro-you." · "Be less chair." · "You sure you are 20s?"
+Break reminders for humans glued to their chair. Tray-first, idle-aware nudges that make your spine breathe.
 
-TouchGrass is a lightweight Tauri desktop companion that keeps you honest about your screen time. It lives in your tray, pops up playful break reminders, and adapts to your workflow with idle-aware scheduling, configurable cadences, and quick controls.
+> Micro-breaks, macro-you.
 
-![TouchGrass settings window](docs/screenshot-settings.png)
+TouchGrass lives in your tray, watches keyboard and mouse activity (never what you type), and taps your shoulder before your neck files a complaint. Tiny notifications, optional chimes, zero guilt trips.
 
-## Download
+## Grab a build
 
-- **Latest installers** – grab the current release for Debian, Fedora, or Windows from the [Releases page](../../releases).
-- **Auto updates** – once installed, TouchGrass checks for updates when it launches and offers a one-click install inside the app.
+- Latest installers for Debian, Fedora, and Windows sit on the [Releases page](../../releases). No macOS build yet-I can’t stand that OS, but never say never.
+- Already installed? TouchGrass checks for updates on launch and offers a one-click install.
 
-## Features
+## What makes it stick
 
-- **Adaptive reminders** – choose from common presets or custom intervals; timers automatically restart when you have been idle for a user-defined window (default 2 min).
-- **Idle detection** – watches keyboard/mouse activity only; no keystroke logging, no network calls.
-- **Tray-first UX** – pause/resume, snooze (5/15 min), open settings, or quit directly from the tray menu.
-- **Playful nudges** – native notifications with optional chime, plus the latest reminder message surfaced in the UI.
-- **Dark by default** – theme token system with one-click light mode for the rebels.
-- **Autostart toggle** – launch at login without digging through OS preference panes.
+- **Idle-aware timers** - reminders land only when you are actually working.
+- **Tray-first control** - snooze, pause, tweak intervals, or pop settings straight from the tray.
+- **Quick status** - next reminder, last break, idle streak, and test reminder all in one panel.
+- **Opt-in chime** - toggle the audio prod if you want a little extra nudge.
+- **Auto updates** - fetch and install new builds without leaving the app.
+- **Autostart switch** - boot with the OS, skip the preference spelunking.
 
-## Stack
+## How it behaves
 
-| Layer              | Choice                           | Notes                                                 |
-| ------------------ | -------------------------------- | ----------------------------------------------------- |
-| Desktop shell      | [Tauri](https://tauri.app)       | Native packaging, tiny footprint, secure bridge       |
-| Backend            | Rust (async)                     | Handles scheduling, idle detection, system APIs       |
-| Frontend           | Svelte + Vite                    | Fast boot, component-driven UI, easy theming          |
-| Persistence        | JSON in app config dir           | Preferences stored locally per user                   |
-| Idle detection     | [`user-idle2`](https://crates.io/crates/user-idle2) | Cross-platform idle time polling                     |
-| Notifications      | `tauri-plugin-notification`      | Native notification APIs per platform                 |
-| Autostart          | `tauri-plugin-autostart`         | One-line launch-at-login integration                  |
+1. Load preferences from `preferences.json` so interval, idle threshold, theme, and toggles survive restarts.
+2. A background worker polls idle time every 20 s. If you wander off past the threshold, the timer resets when you return.
+3. When the clock hits zero and you are active, TouchGrass fires a native notification, emits `touchgrass://reminder` for the chime, then schedules the next break.
+4. Status events keep the Svelte UI and tray menu in sync-pause state, snooze end, and next trigger.
 
-## How it works
+## Under the hood
 
-1. **Preferences** load from `preferences.json` and are cached in state (interval, idle threshold, toggles, theme).
-2. A background worker waits for the next reminder, polling OS idle time every 20 s. If you have been idle longer than the configured threshold, the timer restarts when you resume activity.
-3. When the timer elapses and you are active, TouchGrass fires a notification, emits a `touchgrass://reminder` event (UI chime), and schedules the next break.
-4. Status events keep the Svelte UI and tray menu in sync-pause state, snooze end, next trigger timestamp, and the most recent idle seconds reading.
+| Layer          | Choice                           | Notes                                             |
+| -------------- | -------------------------------- | ------------------------------------------------- |
+| Desktop shell  | [Tauri](https://tauri.app)       | Native packaging, tiny footprint                  |
+| Backend        | Rust (async)                     | Schedules timers, polls idle, bridges system APIs |
+| Frontend       | Svelte + Vite                    | Fast boot, themeable components                   |
+| Persistence    | JSON in app config dir           | Preferences stay local per user                   |
+| Idle detection | [`user-idle2`](https://crates.io/crates/user-idle2) | Cross-platform idle polling                      |
+| Notifications  | `tauri-plugin-notification`      | Native notification APIs                          |
+| Autostart      | `tauri-plugin-autostart`         | One-liner launch at login                         |
 
-## Requirements
+## What you need installed
 
 | Tooling | Notes |
 | ------- | ----- |
 | Rust    | Stable toolchain via `rustup` (1.70+ recommended) |
-| Node.js | 18+ (paired with `pnpm`) |
-| pnpm    | 8+ |
+| Node.js | 18+ paired with `pnpm`                            |
+| pnpm    | 8+                                                |
 
-### Platform prerequisites
+### Platform prep
 
-TouchGrass relies on WebKitGTK + tray dependencies. Install them before running `pnpm tauri dev` or `cargo check`.
+TouchGrass depends on WebKitGTK plus tray packages. Install them before `pnpm tauri dev` or `cargo check`.
 
 <details>
 <summary>Debian / Ubuntu</summary>
@@ -84,36 +84,36 @@ sudo pacman -S --needed webkit2gtk-4.1 gtk3 libappindicator-gtk3 libxss dbus
 
 </details>
 
-## Getting started
+## Run it locally
 
 ```bash
-# Install toolchains (first run only)
+# Toolchains (first run)
 rustup default stable
 cargo install tauri-cli
 
-# JS dependencies
+# JavaScript deps
 pnpm install
 
-# Launch the desktop app in dev mode
+# Desktop app in dev mode
 pnpm tauri dev
 ```
 
-The Tauri dev server automatically spins up the Svelte frontend (`pnpm dev`) and hot reloads on source changes.
+The dev server spins up the Svelte frontend (`pnpm dev`) and hot reloads when you tweak code.
 
-## Configuration
+## Tweak your reminders
 
-All settings persist automatically and restore on startup. Highlighted options:
+All settings persist and restore on launch.
 
-- **Reminder interval** – presets (15/25/30/45/60/90) or custom minutes.
-- **Idle threshold** – minutes of inactivity that qualify as a break (1–30); the timer restarts when you resume after a longer idle period.
-- **Activity detection** – disable to behave like a simple recurring timer.
-- **Chime** – toggle the notification sound.
-- **Autostart** – launch TouchGrass at login.
-- **Theme** – dark (default) or light UI.
+- **Reminder interval** - presets (15/25/30/45/60/90) or your own number.
+- **Idle threshold** - minutes of inactivity that count as a break (1–30).
+- **Activity detection** - disable for a simple recurring timer.
+- **Chime** - flip the sound on or off.
+- **Autostart** - launch TouchGrass at login.
+- **Theme** - dark by default, light if you insist.
 
-Preferences live in the OS config dir, e.g. `~/Library/Application Support/touchgrass/preferences.json`, `~/.config/touchgrass/preferences.json`, or `%APPDATA%\touchgrass\preferences.json` depending on platform.
+Preferences live in the OS config dir: `~/Library/Application Support/touchgrass/preferences.json`, `~/.config/touchgrass/preferences.json`, or `%APPDATA%\touchgrass\preferences.json`.
 
-## Development scripts
+## Dev shortcuts
 
 ```bash
 pnpm dev         # Svelte-only dev server
@@ -126,37 +126,36 @@ pnpm tauri build # Produce native binaries (requires platform toolchains)
 Rust helpers:
 
 ```bash
-cargo check  # Validate the Rust backend
-cargo fmt    # Format Rust sources
+cargo check
+cargo fmt
 ```
 
-## Packaging & updates
+## Packaging flow
 
-- **Platforms** – Maintained installers for Debian (`.deb`), Fedora (`.rpm`), and Windows (`.msi`/`.zip`) publish automatically whenever a `v*` tag lands.
-- **Maintainer note** – Follow `docs/release-guide.md` when preparing a new version or rotating signing keys.
+- Debian (`.deb`), Fedora (`.rpm`), and Windows (`.msi`/`.zip`) installers publish automatically on every `v*` tag.
+- Maintainers: follow `docs/release-guide.md` when prepping releases or rotating signing keys.
 
 ## Roadmap snapshot
 
-- [x] MVP reminder loop with idle-aware scheduling
-- [x] Tray menu + settings UI + optional chime
-- [x] Cross-platform packaging (Debian/RPM/Windows) with signed auto-updates
-- [ ] macOS build target & notarization pipeline
-- [ ] Automated tests & smoke-test matrix
-- [ ] Additional quick actions (custom snooze lengths, shortcuts)
+- [x] Idle-aware reminder loop with tray controls
+- [x] Cross-platform builds with signed auto-updates
+- [ ] macOS target and notarization
+- [ ] Automated tests and smoke matrix
+- [ ] More quick actions (custom snooze lengths, shortcuts)
 
-## Contributing
+## Contribute without being a jerk
 
-Feedback, issue reports, and pull requests are welcome. Please align with the brand guidelines (`brand-guidelines.md`) and keep the tone playful-sarcastic, never mean.
+Feedback, issues, and PRs welcome. Stick to the brand guidelines (`brand-guidelines.md`) and keep the tone playful, not mean.
 
-1. Fork & clone the repo.
+1. Fork and clone the repo.
 2. Create a topic branch.
-3. Run `pnpm tauri dev` to iterate locally.
-4. Include `pnpm check` / `cargo check` output before opening a PR.
+3. Run `pnpm tauri dev` while you iterate.
+4. Include `pnpm check` and `cargo check` output in your PR.
 
 ## License
 
-License to be announced. All brand assets © TouchGrass contributors.
+Built with plenty of AI copiloting and zero gatekeeping. Use, remix, and ship it in whatever form you want. I won’t chase you down, and even if I changed my mind, the lawyer bill would flatten me.
 
 ---
 
-Built with Tauri because fast desktops deserve small footprints. Inspired by everyone whose spine deserves better. Your spine will thank you.
+Sure you are in your 20s? Your neck disagrees. TouchGrass is open source, built with Tauri and Svelte, and here to keep you from permanently fusing with the chair.

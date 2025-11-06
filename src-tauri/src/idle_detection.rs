@@ -54,13 +54,13 @@ impl IdleDetector {
         is_idle: Arc<AtomicBool>,
     ) -> Option<WaylandIdleHandle> {
         use wayland_client::{
-            Connection, Dispatch, QueueHandle, EventQueue,
             globals::{registry_queue_init, GlobalListContents},
             protocol::{wl_registry, wl_seat},
+            Connection, Dispatch, EventQueue, QueueHandle,
         };
         use wayland_protocols::ext::idle_notify::v1::client::{
+            ext_idle_notification_v1::{Event as IdleEvent, ExtIdleNotificationV1},
             ext_idle_notifier_v1::ExtIdleNotifierV1,
-            ext_idle_notification_v1::{ExtIdleNotificationV1, Event as IdleEvent},
         };
 
         let conn = match Connection::connect_to_env() {
@@ -133,7 +133,7 @@ impl IdleDetector {
                         state.is_idle.store(true, Ordering::Relaxed);
                         state.idle_since_timestamp.store(
                             now_secs.saturating_sub(state.threshold_secs),
-                            Ordering::Relaxed
+                            Ordering::Relaxed,
                         );
                     }
                     IdleEvent::Resumed => {
@@ -146,10 +146,11 @@ impl IdleDetector {
         }
 
         let handle = std::thread::spawn(move || {
-            let (globals, mut event_queue): (_, EventQueue<AppData>) = match registry_queue_init(&conn) {
-                Ok(result) => result,
-                Err(_) => return,
-            };
+            let (globals, mut event_queue): (_, EventQueue<AppData>) =
+                match registry_queue_init(&conn) {
+                    Ok(result) => result,
+                    Err(_) => return,
+                };
 
             let qh = event_queue.handle();
 
@@ -171,7 +172,8 @@ impl IdleDetector {
             let seat = app_data.seat.as_ref().unwrap();
             let idle_notifier = app_data.idle_notifier.as_ref().unwrap();
             let timeout_ms = threshold_secs * 1000;
-            let _idle_notification = idle_notifier.get_idle_notification(timeout_ms as u32, seat, &qh, ());
+            let _idle_notification =
+                idle_notifier.get_idle_notification(timeout_ms as u32, seat, &qh, ());
 
             loop {
                 if event_queue.blocking_dispatch(&mut app_data).is_err() {
@@ -224,9 +226,7 @@ impl IdleDetector {
                 let secs = duration.as_seconds();
                 Ok(secs)
             }
-            Err(_e) => {
-                Err(IdleDetectionError::X11Error)
-            }
+            Err(_e) => Err(IdleDetectionError::X11Error),
         }
     }
 }

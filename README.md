@@ -37,7 +37,7 @@ TouchGrass is a lightweight Tauri desktop companion that keeps you honest about 
 1. **Preferences** load from `preferences.json` and are cached in state (interval, idle threshold, toggles, theme).
 2. A background worker waits for the next reminder, polling OS idle time every 20 s. If you have been idle longer than the configured threshold, the timer restarts when you resume activity.
 3. When the timer elapses and you are active, TouchGrass fires a notification, emits a `touchgrass://reminder` event (UI chime), and schedules the next break.
-4. Status events keep the Svelte UI and tray menu in sync—pause state, snooze end, next trigger timestamp, and the most recent idle seconds reading.
+4. Status events keep the Svelte UI and tray menu in sync-pause state, snooze end, next trigger timestamp, and the most recent idle seconds reading.
 
 ## Requirements
 
@@ -146,7 +146,7 @@ cargo fmt    # Format Rust sources
 
 ## Contributing
 
-Feedback, issue reports, and pull requests are welcome. Please align with the brand guidelines (`brand-guidelines.md`) and keep the tone playful—sarcastic, never mean.
+Feedback, issue reports, and pull requests are welcome. Please align with the brand guidelines (`brand-guidelines.md`) and keep the tone playful-sarcastic, never mean.
 
 1. Fork & clone the repo.
 2. Create a topic branch.

@@ -17,6 +17,9 @@ use tauri::{
 };
 use tauri_plugin_notification::NotificationExt;
 
+#[cfg(target_os = "linux")]
+use notify_rust::Notification as LinuxNotification;
+
 use crate::{events, idle_detection::IdleDetector, tray::TrayState};
 
 const PREFERENCES_FILE: &str = "preferences.json";
@@ -214,6 +217,10 @@ impl AppState {
         let _ = self.control_tx.send(ControlMessage::ClearSnooze).await;
     }
 
+    pub async fn skip_current_break(&self) {
+        let _ = self.control_tx.send(ControlMessage::SkipCurrent).await;
+    }
+
     pub async fn trigger_preview(&self) {
         let _ = self.control_tx.send(ControlMessage::TriggerNow).await;
     }
@@ -243,6 +250,7 @@ enum ControlMessage {
     Pause(bool),
     Snooze(Duration),
     ClearSnooze,
+    SkipCurrent,
     TriggerNow,
 }
 
@@ -530,6 +538,22 @@ async fn run_engine(
                             snapshot.idle_seconds = last_idle_secs;
                         });
                     }
+                    ControlMessage::SkipCurrent => {
+                        snoozed_until = None;
+                        if !paused {
+                            next_instant = Instant::now() + prefs.interval_duration();
+                            sleep.as_mut().reset(next_instant);
+                        }
+                        update_status(&app, &status, |snapshot| {
+                            snapshot.snoozed_until = None;
+                            snapshot.next_trigger_at = if paused {
+                                None
+                            } else {
+                                Some(timestamp_from_instant(next_instant))
+                            };
+                            snapshot.idle_seconds = last_idle_secs;
+                        });
+                    }
                     ControlMessage::TriggerNow => {
                         send_reminder(&app, &prefs).await;
                         let now = Utc::now();
@@ -620,23 +644,50 @@ async fn send_reminder(app: &AppHandle<Wry>, prefs: &Preferences) {
 
     eprintln!("TouchGrass: Using notification icon path: {}", icon_path);
 
-    // Build notification with app icon
-    let notification_result = app
-        .notification()
-        .builder()
-        .title("TouchGrass")
-        .body(message.clone())
-        .icon(icon_path)
-        .show();
+    #[cfg(target_os = "linux")]
+    let app_state = app
+        .try_state::<Arc<AppState>>()
+        .map(|state| state.inner().clone());
 
-    if let Err(err) = notification_result {
-        let _ = app.emit(
-            events::LOG_EVENT,
-            events::LogPayload {
-                level: "error".into(),
-                message: format!("notification error: {err}"),
-            },
-        );
+    #[cfg(target_os = "linux")]
+    let handled_by_native_actions =
+        match show_linux_notification_with_actions(app, &message, &icon_path, app_state.clone()) {
+            Ok(()) => true,
+            Err(err) => {
+                eprintln!("TouchGrass: linux notification with actions failed: {err}");
+                let _ = app.emit(
+                    events::LOG_EVENT,
+                    events::LogPayload {
+                        level: "error".into(),
+                        message: format!("notification action setup failed: {err}"),
+                    },
+                );
+                false
+            }
+        };
+
+    #[cfg(not(target_os = "linux"))]
+    let handled_by_native_actions = false;
+
+    if !handled_by_native_actions {
+        // Build notification with app icon (fallback without action buttons)
+        let notification_result = app
+            .notification()
+            .builder()
+            .title("TouchGrass")
+            .body(message.clone())
+            .icon(icon_path.clone())
+            .show();
+
+        if let Err(err) = notification_result {
+            let _ = app.emit(
+                events::LOG_EVENT,
+                events::LogPayload {
+                    level: "error".into(),
+                    message: format!("notification error: {err}"),
+                },
+            );
+        }
     }
 
     let _ = app.emit(
@@ -646,6 +697,275 @@ async fn send_reminder(app: &AppHandle<Wry>, prefs: &Preferences) {
             sound_enabled: prefs.sound_enabled,
         },
     );
+}
+
+#[cfg(target_os = "linux")]
+fn show_linux_notification_with_actions(
+    app: &AppHandle<Wry>,
+    message: &str,
+    icon_path: &str,
+    state: Option<Arc<AppState>>,
+) -> Result<(), notify_rust::error::Error> {
+    const ACTION_REMIND_IN_FIVE: &str = "touchgrass.remind_in_5";
+    const ACTION_SKIP_BREAK: &str = "touchgrass.skip_break";
+
+    const REMIND_VARIANTS: &[(&str, &str)] = &[
+        (
+            "Give me five",
+            "Notification action: Give me five - stretch IOU noted.",
+        ),
+        (
+            "Hit me in five",
+            "Notification action: Hit me in five - calendar set to wiggle.",
+        ),
+        (
+            "Let me finish this",
+            "Notification action: Let me finish this - timer's waiting with sass.",
+        ),
+        (
+            "Nudge me in five",
+            "Notification action: Nudge me in five - snooze engaged, zen pending.",
+        ),
+        (
+            "Back in five",
+            "Notification action: Back in five - chair misses you already.",
+        ),
+        (
+            "Ping me in five",
+            "Notification action: Ping me in five - reminder primed and ticking.",
+        ),
+        (
+            "Five-minute breather",
+            "Notification action: Five-minute breather - lungs scheduled.",
+        ),
+        (
+            "BRB - 5",
+            "Notification action: BRB - 5 - calendar winked, timer reset.",
+        ),
+        (
+            "Snooze (5m)",
+            "Notification action: Snooze (5m) - cushions fluffing virtually.",
+        ),
+        (
+            "Circle back in 5",
+            "Notification action: Circle back in 5 - orbit plotted.",
+        ),
+        (
+            "Tap me in five",
+            "Notification action: Tap me in five - coach has the whistle.",
+        ),
+        (
+            "Five more, coach",
+            "Notification action: Five more, coach - hustle annotated.",
+        ),
+        (
+            "Hold my coffee (5m)",
+            "Notification action: Hold my coffee - countdown steaming.",
+        ),
+        (
+            "One more commit (5m)",
+            "Notification action: One more commit - git blame accepted.",
+        ),
+        (
+            "Let me wrap up (5m)",
+            "Notification action: Wrap up (5m) - ribbon pending.",
+        ),
+        (
+            "After this build (5m)",
+            "Notification action: After this build - CI/CD bribed.",
+        ),
+        (
+            "After this test (5m)",
+            "Notification action: After this test - assertions appeased.",
+        ),
+        (
+            "After this call (5m)",
+            "Notification action: After this call - small talk queued.",
+        ),
+        (
+            "Remind in five",
+            "Notification action: Remind in five - patience, grasshopper.",
+        ),
+        (
+            "Later - five",
+            "Notification action: Later - five - calendar gave a nod.",
+        ),
+        (
+            "Five ticks, please",
+            "Notification action: Five ticks - metronome set.",
+        ),
+        (
+            "Back shortly (5m)",
+            "Notification action: Back shortly - away message drafted.",
+        ),
+        (
+            "Give me 5 min",
+            "Notification action: Give me 5 min - sand timer flipped.",
+        ),
+        (
+            "Hit snooze (5m)",
+            "Notification action: Hit snooze - alarm tucked in.",
+        ),
+    ];
+
+    const SKIP_VARIANTS: &[(&str, &str)] = &[
+        (
+            "Skip this lap",
+            "Notification action: Skip this lap. Hustle responsibly.",
+        ),
+        (
+            "Skip - boss cameo",
+            "Notification action: Skip - noted, boss cameo logged.",
+        ),
+        (
+            "Skip, still grinding",
+            "Notification action: Skip - grind streak acknowledged.",
+        ),
+        (
+            "Skip this one",
+            "Notification action: Skip - this round benched.",
+        ),
+        (
+            "Skip - on a roll",
+            "Notification action: Skip - momentum protected.",
+        ),
+        (
+            "Skip - deep focus",
+            "Notification action: Skip - tunnel vision honored.",
+        ),
+        (
+            "Skip - deadline sprint",
+            "Notification action: Skip - sprint shoes laced.",
+        ),
+        (
+            "Skip - meeting just started",
+            "Notification action: Skip - calendar drama respected.",
+        ),
+        (
+            "Skip - quick call",
+            "Notification action: Skip - headset hair justified.",
+        ),
+        (
+            "Skip - compiling",
+            "Notification action: Skip - compiler chanting arcana.",
+        ),
+        (
+            "Skip - shipping now",
+            "Notification action: Skip - release train departing.",
+        ),
+        (
+            "Skip - demo time",
+            "Notification action: Skip - stage lights warmed.",
+        ),
+        (
+            "Skip - eyes on logs",
+            "Notification action: Skip - log rain interpreted.",
+        ),
+        (
+            "Skip - pair session",
+            "Notification action: Skip - duo mode enabled.",
+        ),
+        (
+            "Skip - network flaky",
+            "Notification action: Skip - packets doing parkour.",
+        ),
+        (
+            "Skip - not now",
+            "Notification action: Skip - vibes evaluated.",
+        ),
+        (
+            "Skip - almost done",
+            "Notification action: Skip - finish line in sight.",
+        ),
+        (
+            "Skip - coffee run",
+            "Notification action: Skip - caffeine diplomacy underway.",
+        ),
+        (
+            "Skip - writing email",
+            "Notification action: Skip - subject line negotiating.",
+        ),
+        (
+            "Skip - keyboard on fire",
+            "Notification action: Skip - typing WPM illegal.",
+        ),
+        (
+            "Skip - late-night grind",
+            "Notification action: Skip - owls co-signed.",
+        ),
+        (
+            "Skip - screen share",
+            "Notification action: Skip - pixels in public.",
+        ),
+        (
+            "Skip - standup soon",
+            "Notification action: Skip - jokes rehearsed.",
+        ),
+    ];
+
+    let mut rng = rng();
+    let (remind_label, remind_log) = REMIND_VARIANTS.choose(&mut rng).copied().unwrap_or((
+        "Give me five",
+        "Notification action: Give me five - stretch IOU noted.",
+    ));
+    let (skip_label, skip_log) = SKIP_VARIANTS.choose(&mut rng).copied().unwrap_or((
+        "Skip this lap",
+        "Notification action: Skip this lap. Hustle responsibly.",
+    ));
+
+    let handle = LinuxNotification::new()
+        .summary("TouchGrass")
+        .body(message)
+        .icon(icon_path)
+        .action(ACTION_REMIND_IN_FIVE, remind_label)
+        .action(ACTION_SKIP_BREAK, skip_label)
+        .show()?;
+
+    let app_for_actions = app.clone();
+    let state_for_actions = state.clone();
+    let remind_log = remind_log;
+    let skip_log = skip_log;
+
+    async_runtime::spawn_blocking(move || {
+        handle.wait_for_action(move |identifier| {
+            let app_handle = app_for_actions.clone();
+            let state_arc = state_for_actions.clone();
+
+            match identifier {
+                ACTION_REMIND_IN_FIVE => {
+                    if let Some(state) = state_arc.clone() {
+                        async_runtime::spawn(async move {
+                            state.snooze(5).await;
+                        });
+                    }
+                    let _ = app_handle.emit(
+                        events::LOG_EVENT,
+                        events::LogPayload {
+                            level: "info".into(),
+                            message: remind_log.into(),
+                        },
+                    );
+                }
+                ACTION_SKIP_BREAK => {
+                    if let Some(state) = state_arc {
+                        async_runtime::spawn(async move {
+                            state.skip_current_break().await;
+                        });
+                    }
+                    let _ = app_handle.emit(
+                        events::LOG_EVENT,
+                        events::LogPayload {
+                            level: "info".into(),
+                            message: skip_log.into(),
+                        },
+                    );
+                }
+                _ => {}
+            }
+        });
+    });
+
+    Ok(())
 }
 
 fn choose_reminder_message() -> String {

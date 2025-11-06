@@ -6,6 +6,10 @@ on:
       - "v*"
   workflow_dispatch:
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   PNPM_VERSION: 10
   NODE_VERSION: 20
@@ -229,10 +233,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
+      - name: Download all artifacts (flatten)
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: Generate latest.json for updater
         env:
@@ -242,31 +247,37 @@ jobs:
           python3 - <<'PY'
           import json, pathlib, os, datetime
 
-          artifacts = pathlib.Path("artifacts")
+          root = pathlib.Path("artifacts")
           repo = os.environ["REPO"]
           tag = os.environ["TAG"]
           version = tag[1:] if tag.startswith("v") else tag
 
+          # Build a lookup of signatures by exact asset filename (strip the .sig)
+          sig_map = {p.name[:-4]: p for p in root.rglob("*.sig")}  # key: "file.ext"
+
           platforms = {}
 
-          def add(sig_path: pathlib.Path, asset_path: pathlib.Path, platform_key: str):
-              if sig_path.exists() and asset_path.exists():
-                  url = f"https://github.com/{repo}/releases/download/{tag}/{asset_path.name}"
-                  signature = sig_path.read_text(encoding="utf-8").strip()
-                  platforms[platform_key] = {"signature": signature, "url": url}
+          def add(asset_path: pathlib.Path, platform_key: str):
+            sig_path = sig_map.get(asset_path.name)
+            if not sig_path:
+              print(f"!! missing signature for {asset_path.name}")
+              return
+            signature = sig_path.read_text(encoding="utf-8").strip()
+            url = f"https://github.com/{repo}/releases/download/{tag}/{asset_path.name}"
+            platforms[platform_key] = {"signature": signature, "url": url}
+            print(f"added {platform_key} -> {asset_path.name}")
 
-          # Windows MSI + signature
-          for msi in artifacts.rglob("*.msi"):
-              sig = msi.with_suffix(msi.suffix + ".sig")   # .msi.sig
-              add(sig, msi, "windows-x86_64")
+          # Windows MSI (+ matching .msi.sig anywhere under artifacts/)
+          for msi in root.rglob("*.msi"):
+            add(msi, "windows-x86_64")
 
-          # Linux AppImage + signature (used by Tauri updater on Linux)
-          for app in artifacts.rglob("*.AppImage"):
-              sig = app.with_suffix(app.suffix + ".sig")   # .AppImage.sig
-              add(sig, app, "linux-x86_64")
+          # Linux AppImage (+ matching .AppImage.sig anywhere under artifacts/)
+          for app in root.rglob("*.AppImage"):
+            add(app, "linux-x86_64")
 
           if not platforms:
-              raise SystemExit("No updater artifacts (.sig + bundle) found")
+            raise SystemExit("No updater artifacts (.sig + bundle) found. "
+                             "Checked for .msi/.AppImage with matching .sig anywhere under artifacts/")
 
           latest = {
             "version": version,
@@ -275,14 +286,14 @@ jobs:
             "platforms": platforms
           }
 
-          out = artifacts / "merged" / "latest.json"
+          out = root / "merged" / "latest.json"
           out.parent.mkdir(parents=True, exist_ok=True)
           out.write_text(json.dumps(latest, indent=2), encoding="utf-8")
           print(f"Wrote {out}")
           PY
 
       - name: List artifacts (debug)
-        run: ls -R artifacts | sed -n '1,400p'
+        run: ls -lah artifacts | sed -n '1,400p'
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -292,12 +303,12 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
-            artifacts/**/*.msi
-            artifacts/**/*.zip
-            artifacts/**/*.AppImage
-            artifacts/**/*.sig
+            artifacts/*.deb
+            artifacts/*.rpm
+            artifacts/*.msi
+            artifacts/*.zip
+            artifacts/*.AppImage
+            artifacts/*.sig
             artifacts/merged/latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
